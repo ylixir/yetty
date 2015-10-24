@@ -4,7 +4,7 @@ DFLAGS = -O0 -g -std=c99 -Wall -Wextra -pedantic -D_XOPEN_SOURCE -D_XOPEN_SOURCE
 LFLAGS = -L/usr/lib -ltermbox
 SOURCES = $(wildcard *.c)
 OBJECTS = $(SOURCES:%.c=%.o)
-TARGETS = $(OBJECTS:%.o=%)
+TARGETS = yetty
 
 ifeq ($(MODE),debug)
 	CFLAGS=$(DFLAGS)
@@ -16,14 +16,15 @@ endif
 all: $(TARGETS)
 
 $(TARGETS): $(OBJECTS)
+	$(CC) $(CFLAGS) -o $@ $^ $(LFLAGS)
 
 $(OBJECTS): $(SOURCES)
 
 .c.o:
 	$(CC) $(CFLAGS) -c $< -o $@
 
-%:%.o
-	$(CC) $(CFLAGS) -o $@ $< $(LFLAGS)
+#%:%.o
+#	$(CC) $(CFLAGS) -o $@ $< $(LFLAGS)
 
 .PHONY: debug
 debug:

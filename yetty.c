@@ -6,6 +6,8 @@
  *
  */
 
+/* and here we have the main program file */
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <errno.h>
@@ -13,8 +15,8 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/ioctl.h>
-#include <termbox.h>
-#include <stdbool.h>
+
+#include "toolkit.h"
 
 /* these two functions provide some error logging */
 void fail(const char message[])
@@ -47,6 +49,7 @@ void open_tty(const char tty[])
     fail_and_bail("Didn't assign the tty to stdin");
   dup2(0,1); /* stdout */
   dup2(0,2); /* stderr */
+  fflush(NULL);
 
   /* i'm leaving this here, in case it's needed for portability,
    * but consider the reverse implication of O_NOCTTY
@@ -58,27 +61,14 @@ void open_tty(const char tty[])
   */
 }
 
-bool print(int x, int y, uint32_t *str, uint16_t fg, uint16_t bg)
-{
-  int w = tb_width();
-  struct tb_cell *cells = tb_cell_buffer();
-  cells += y*w;
-  cells += x;
-  for(int i=0; str[i] != 0 && x+i<w; i++)
-    *(cells+i)=(struct tb_cell){.ch=str[i], .fg=fg, .bg=bg};
-  return true;
-}
-
 int main(int argc, char *argv[])
 {
-  char *test_chr="testing world!";
-  uint32_t test[15];
-  for(int i=0; i<15;i++)
-    test[i]=test_chr[i];
-
-  if(argv[1]) open_tty(argv[1]);
+  if(argc>1 && argv[1]) open_tty(argv[1]);
   else open_tty("/dev/tty1");
 
+  box_unmake(box_make(0,0,1,1,box_type));
+  box_start();
+  /*
   if(tb_init())
       fail("tb_init");
   tb_clear();
@@ -102,8 +92,5 @@ int main(int argc, char *argv[])
     tb_present();
   }
   tb_shutdown();
-
-  /* make the compiler happy, remove at the end of the day */
-  if(argc)
-    printf(argv[0]);
+*/
 }
