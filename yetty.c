@@ -8,6 +8,13 @@
 
 /* and here we have the main program file */
 
+/* usage:
+ * yetty [ /dev/tty? | notty ]
+ *
+ * not passing a parameter will cause yetty to launch on tty1
+ * passing notty for running in xterm or something
+ */
+
 #include <stdlib.h>
 #include <stdio.h>
 #include <errno.h>
@@ -16,7 +23,7 @@
 #include <fcntl.h>
 #include <sys/ioctl.h>
 
-#include "toolkit.h"
+#include "box.h"
 
 /* these two functions provide some error logging */
 void fail(const char message[])
@@ -63,10 +70,12 @@ void open_tty(const char tty[])
 
 int main(int argc, char *argv[])
 {
-  if(argc>1 && argv[1]) open_tty(argv[1]);
-  else open_tty("/dev/tty1");
+  if(1==argc)
+    open_tty("/dev/tty1");
+  else if(strcmp(argv[1],"notty"))
+    open_tty(argv[1]);
 
-  box_unmake(box_make(0,0,1,1,box_type));
+  box_unmake(box_make((op){0,0},(op){10,1}));
   box_start();
   /*
   if(tb_init())
