@@ -75,7 +75,7 @@ int main(int argc, char *argv[])
   else if(strcmp(argv[1],"notty"))
     open_tty(argv[1]);
 
-  Box b =box_make((op){0,0},(op){10,1});
+  Box b =box_make((op){10,10},(op){10,1});
   box_text(b,"H");
   box_start();
   box_unmake(b);

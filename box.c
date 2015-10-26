@@ -13,6 +13,7 @@
 
 #include <string.h>
 #include <stdio.h>
+#include <ctype.h>
 
 #define BOX_EVENTS 6
 
@@ -82,13 +83,13 @@ bool box_default_key_handler(Box b, BoxEvent bev)
   default:
     if(bev.ch)
     {
-      char utf[8];
+      char utf[6]={0,0,0,0,0,0,};
       tb_utf8_unicode_to_char(utf,bev.ch);
       if(b->text)
         bxstr_append(b->text,utf);
       else
         b->text=bxstr_make(utf);
-      //tb_clear();
+      tb_clear();
       box_redraw(&rootbox);
       box_redraw(zstack);
       tb_present();
