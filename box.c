@@ -9,27 +9,163 @@
 /* the implementation of a simple termbox based toolkit */
 
 #include "box.h"
+#include "boxstr.h"
 
-#include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
+
+#define BOX_EVENTS 6
 
 typedef struct BoxData BoxData;
 struct BoxData {
   op place, size;
-  char* text;
+  bxstr text;
   bool border, ro;
+  BoxHandler handlers[BOX_EVENTS];
   Box next;
 };
-BoxData rootbox = {{0,0},{0,0},0,false,false,0};
+BoxData rootbox = {{0,0},{0,0},0,false,false,{0,0,0,0,0,0},0};
 Box zstack = 0;
 Box default_box = 0;
 Box focus_box = 0;
+
+void box_redraw(Box b)
+{
+  if(b->next)
+    box_redraw(b->next);
+
+  struct tb_cell* canvas = tb_cell_buffer();
+  char* i = b->text?bxstr_raw(b->text):"";
+  for(size_t y=b->place.y;y<b->place.y+box_get_size(b).y;y++)
+  {
+    for(size_t x=b->place.x;x<b->place.x+box_get_size(b).x;x++)
+    {
+      if(!i) break;
+      tb_utf8_char_to_unicode(&((canvas+y*box_get_size(b).x+x)->ch),i);
+      i += tb_utf8_char_length(*i);
+    }
+  }
+}
+
+BoxHandler box_event_handler(Box b, BoxEventType type, BoxHandler handler)
+{
+  BoxHandler old = b->handlers[type];
+  b->handlers[type]=handler;
+  return old;
+}
+bool box_call_handler(Box b, BoxEvent bev);
+
+bool box_default_key_handler(Box b, BoxEvent bev)
+{
+  switch(bev.key)
+  {
+  case TB_KEY_TAB:;
+    Box last, next;
+    last = b;
+    next = last->next?last->next:zstack;
+    focus_box = next;
+
+    bev.type=BOX_EVENT_FOCUS;
+    bev.key=0;
+    box_call_handler(last,bev);
+
+    bev.place = next->place;
+    bev.size = next->size;
+    box_call_handler(next,bev);
+    break;
+  case TB_KEY_ENTER:
+    bev.type=BOX_EVENT_ACTIVATE;
+    bev.place=default_box->place;
+    bev.size=default_box->size;
+    box_call_handler(default_box,bev);
+    break;
+  default:
+    if(bev.ch)
+    {
+      char utf[8];
+      tb_utf8_unicode_to_char(utf,bev.ch);
+      if(b->text)
+        bxstr_append(b->text,utf);
+      else
+        b->text=bxstr_make(utf);
+      //tb_clear();
+      box_redraw(&rootbox);
+      box_redraw(zstack);
+      tb_present();
+    }
+  }
+  return true;
+}
+bool box_default_activate_handler(Box b,BoxEvent bev)
+{
+  /* kill warnings */
+  Box a=bev.type?b:b+1; a=a?a:a+1;
+
+  box_finish();
+  return true;
+}
+bool box_default_focus_handler(Box b,BoxEvent bev)
+{
+  /* kill warnings */
+  Box a=bev.type?b:b+1; a=a?a:a+1;
+
+  return true;
+}
+BoxHandler box_default_handlers[BOX_EVENTS] =
+{
+  &box_default_key_handler,
+  0,
+  &box_default_activate_handler,
+  &box_default_focus_handler,
+  0,0
+};
+
+bool box_call_handler(Box b, BoxEvent bev)
+{
+  BoxHandler h = b->handlers[bev.type],
+             d = box_default_handlers[bev.type];
+
+  /* this mess means call the default if no handler is defined
+   * or call the handler if it is defined. in any case, call the
+   * default if the first thing returns false */
+  return (h?h:d)(b,bev) || d(b,bev);
+}
 
 bool box_running = false;
 /* starts the event loop, make sure to register callbacks first */
 void box_start()
 {
-  box_running = true;
+  box_running = tb_init() < 0 ? false:true;
+  tb_select_input_mode(TB_INPUT_ESC | TB_INPUT_MOUSE);
+  if(box_running)
+  {
+    tb_clear();
+    box_redraw(&rootbox);
+    box_redraw(zstack);
+    tb_present();
+  }
+
+  while(box_running)
+  {
+    struct tb_event tev;
+    BoxEvent bev;
+    memset(&bev,0,sizeof(BoxEvent));
+
+    if(!tb_poll_event(&tev)) box_running = false;
+    else
+    {
+      switch(tev.type)
+      {
+      case TB_EVENT_KEY:
+        bev = (BoxEvent){ BOX_EVENT_KEY,
+          tev.key,tev.ch,
+          focus_box->place,focus_box->size };
+        box_call_handler(focus_box,bev);
+        break;
+      }
+    }
+  }
+  tb_shutdown();
 }
 /* call to exit the event loop */
 void box_finish()
@@ -68,6 +204,7 @@ void box_unmake(Box b)
   if(*i)
   {
     *i=b->next;
+    if(b->text) bxstr_unmake(b->text);
     free(b);
   }
 }
@@ -113,11 +250,12 @@ bool box_get_read_only(Box b)
 /* pass zero/NULL if you don't wish to modify, pass "" to clear */
 char* box_text(Box b, char* text) /* utf8 */
 {
-  if(!b)
-    return 0;
   if(text)
-    b->text=!text[0]?0:text;
-  return b->text;
+  {
+    if(b->text) bxstr_unmake(b->text);
+    b->text = bxstr_make(text);
+  }
+  return b->text?bxstr_raw(b->text):0;
 }
 
 /* default box is activated when enter is pressed */

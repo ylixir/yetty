@@ -12,16 +12,38 @@
 #define box_h
 
 #include <stdbool.h>
+#include <stdlib.h>
 #include <termbox.h>
 
 typedef struct BoxData* Box; /* convenience type */
-typedef struct {int x, y;} op; /* ordered pair */
+typedef struct {size_t x, y;} op; /* ordered pair */
+
+/* data types for the event system. compare to termbox for more info */
+typedef enum {
+  BOX_EVENT_KEY,
+  BOX_EVENT_MOUSE,
+  BOX_EVENT_ACTIVATE, /* called for default box when enter pressed */
+  BOX_EVENT_FOCUS,  /* called for boxes that lose/receive focus */
+  BOX_EVENT_MOVE,
+  BOX_EVENT_RESIZE
+} BoxEventType;
+typedef struct {
+  BoxEventType type;
+  uint16_t key;
+  uint32_t ch;
+  op place, size;
+} BoxEvent;
+typedef bool (*BoxHandler)(Box,BoxEvent);
+/* if you wish to clear an event just pass 0 for hander
+ * the function returns whatever the handler was before
+ * it was modified or -1 for error */
+BoxHandler box_event_handler(Box b, BoxEventType type, BoxHandler handler);
 
 /* starts the event loop, make sure to register callbacks first */
 void box_start();
 /* call to exit the event loop */
 void box_finish();
-/* basically the whole window, you can't unmake, or move this */
+/* basically the whole screen, you can't unmake, move or resize this */
 Box box_root();
 
 /* creates box at with no text */
@@ -38,7 +60,6 @@ bool box_get_border(Box b);
 void box_set_read_only(Box b, bool ro); /* default is false */
 bool box_get_read_only(Box b);
 
-
 /* pass zero/NULL if you don't wish to modify, pass "" to clear */
 char* box_text(Box b, char* text); /* utf8 */
 
@@ -52,21 +73,5 @@ Box box_top(Box box); /* returns top box */
 Box box_bottom(Box box); /* returns bottom box */
 void box_up(Box box);
 void box_down(Box box);
-
-/* event callback types - if you handle the callback, return true */
-typedef bool (*BoxKey)(Box b, uint8_t mod, uint32_t chr);
-typedef bool (*BoxMouse)(Box b, op place, uint16_t button);
-typedef bool (*BoxResize)(Box b, op size);
-typedef bool (*BoxActivate)(Box b);
-typedef bool (*BoxFocus)(Box b);
-
-/* pass 0 for a handler to unset any handlers */
-void box_key_handler(Box b, BoxKey handler);
-void box_mouse_handler(Box b, BoxMouse handler);
-void box_resize_handler(Box b, BoxResize handler);
-void box_activate_handler(Box b, BoxActivate handler);
-/* focus is called for focus received and lost
- * use box_focus to check which */
-void box_focus_handler(Box b, BoxFocus handler);
 
 #endif
