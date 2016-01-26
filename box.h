@@ -31,10 +31,12 @@ typedef struct {
   BoxEventType type;
   uint16_t key;
   uint32_t ch;
-  op place, size;
+  op position, size;
 } BoxEvent;
 typedef bool (*BoxHandler)(Box,BoxEvent);
-/* if you wish to clear an event just pass 0 for hander
+extern const BoxHandler clear_handler, get_handler;
+/* if you wish to clear an event just pass clear_handler
+ * if you wish to get an event just pass get_handler
  * the function returns whatever the handler was before
  * it was modified or -1 for error */
 BoxHandler box_event_handler(Box b, BoxEventType type, BoxHandler handler);
@@ -47,12 +49,12 @@ void box_finish();
 Box box_root();
 
 /* creates box at with no text */
-Box box_make(op place, op size);
+Box box_make(op position, op size);
 /* removes the box from memory */
 void box_unmake(Box b);
 
-void box_set_place(Box b, op place);
-op box_get_place(Box b);
+void box_set_position(Box b, op position);
+op box_get_position(Box b);
 void box_set_size(Box b, op size);
 op box_get_size(Box b);
 void box_set_border(Box b, bool draw); /* default is false */

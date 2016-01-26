@@ -19,13 +19,16 @@
 
 typedef struct BoxData BoxData;
 struct BoxData {
-  op place, size;
+  op position, size;
   bxstr text;
   bool border, ro;
   BoxHandler handlers[BOX_EVENTS];
   Box next;
 };
 BoxData rootbox = {{0,0},{0,0},0,false,false,{0,0,0,0,0,0},0};
+
+const BoxHandler clear_handler = (BoxHandler)0;
+const BoxHandler get_handler = (BoxHandler)-1;
 Box zstack = 0;
 Box default_box = 0;
 Box focus_box = 0;
@@ -37,9 +40,9 @@ void box_redraw(Box b)
 
   struct tb_cell* canvas = tb_cell_buffer();
   char* i = b->text?bxstr_raw(b->text):"";
-  for(size_t y=b->place.y;y<b->place.y+box_get_size(b).y;y++)
+  for(size_t y=b->position.y;y<b->position.y+box_get_size(b).y;y++)
   {
-    for(size_t x=b->place.x;x<b->place.x+box_get_size(b).x;x++)
+    for(size_t x=b->position.x;x<b->position.x+box_get_size(b).x;x++)
     {
       if(!i) break;
       tb_utf8_char_to_unicode(&((canvas+y*box_get_size(b).x+x)->ch),i);
@@ -51,7 +54,8 @@ void box_redraw(Box b)
 BoxHandler box_event_handler(Box b, BoxEventType type, BoxHandler handler)
 {
   BoxHandler old = b->handlers[type];
-  b->handlers[type]=handler;
+  if(get_handler != handler)
+    b->handlers[type]=handler;
   return old;
 }
 bool box_call_handler(Box b, BoxEvent bev);
@@ -70,15 +74,18 @@ bool box_default_key_handler(Box b, BoxEvent bev)
     bev.key=0;
     box_call_handler(last,bev);
 
-    bev.place = next->place;
+    bev.position = next->position;
     bev.size = next->size;
     box_call_handler(next,bev);
     break;
   case TB_KEY_ENTER:
     bev.type=BOX_EVENT_ACTIVATE;
-    bev.place=default_box->place;
+    bev.position=default_box->position;
     bev.size=default_box->size;
     box_call_handler(default_box,bev);
+    break;
+  case TB_KEY_BACKSPACE:
+  case TB_KEY_DELETE:
     break;
   default:
     if(bev.ch)
@@ -99,16 +106,18 @@ bool box_default_key_handler(Box b, BoxEvent bev)
 }
 bool box_default_activate_handler(Box b,BoxEvent bev)
 {
-  /* kill warnings */
-  Box a=bev.type?b:b+1; a=a?a:a+1;
+  /* unused parameters */
+  (void)b; (void)bev;
 
+  /* terminate the event loop */
   box_finish();
   return true;
 }
 bool box_default_focus_handler(Box b,BoxEvent bev)
 {
-  /* kill warnings */
-  Box a=bev.type?b:b+1; a=a?a:a+1;
+  /* unused parameters */
+  (void)b; (void)bev;
+
 
   return true;
 }
@@ -160,7 +169,7 @@ void box_start()
       case TB_EVENT_KEY:
         bev = (BoxEvent){ BOX_EVENT_KEY,
           tev.key,tev.ch,
-          focus_box->place,focus_box->size };
+          focus_box->position,focus_box->size };
         box_call_handler(focus_box,bev);
         break;
       }
@@ -181,13 +190,13 @@ Box box_root()
 }
 
 /* creates box with no text */
-Box box_make(op place, op size)
+Box box_make(op position, op size)
 {
   Box b = malloc(sizeof(BoxData));
   if(b)
   {
     memset(b,0,sizeof(BoxData));
-    b->place = place;
+    b->position = position;
     b->size = size;
     b->next = zstack;
     zstack = b;
@@ -210,14 +219,14 @@ void box_unmake(Box b)
   }
 }
 
-void box_set_place(Box b, op place)
+void box_set_position(Box b, op position)
 {
   if(b)
-    b->place=place;
+    b->position=position;
 }
-op box_get_place(Box b)
+op box_get_position(Box b)
 {
-  return b?b->place:(op){0,0};
+  return b?b->position:(op){0,0};
 }
 void box_set_size(Box b, op size)
 {

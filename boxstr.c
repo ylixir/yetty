@@ -16,8 +16,9 @@ const int GROW_FACTOR=100;
 struct BoxStringData
 {
   char* text;
-  size_t length;
-  size_t space;
+  size_t size;   /*number of bytes in string */
+  size_t space;  /*number of bytes available */
+  size_t length; /*number of characters in string */
 };
 
 bxstr bxstr_make(char* txt)
@@ -26,8 +27,8 @@ bxstr bxstr_make(char* txt)
   txt = txt?txt:"";
   if(bs)
   {
-    bs->length=strlen(txt);
-    bs->space=(bs->length/GROW_FACTOR+1)*GROW_FACTOR;
+    bs->size=strlen(txt);
+    bs->space=(bs->size/GROW_FACTOR+1)*GROW_FACTOR;
     bs->text=malloc(bs->space);
     if(bs->text)
       strncpy(bs->text,txt,bs->space);
@@ -48,7 +49,7 @@ void bxstr_unmake(bxstr bs)
 
 bxstr bxstr_append(bxstr bs, char* add)
 {
-  size_t diff = bs->space-bs->length;
+  size_t diff = bs->space-bs->size;
   size_t al = strlen(add);
   if(diff <= al)
   {
@@ -64,8 +65,8 @@ bxstr bxstr_append(bxstr bs, char* add)
       bs->space= newspace;
     }
   }
-  strcpy(bs->text+bs->length,add);
-  bs->length += al;
+  strcpy(bs->text+bs->size,add);
+  bs->size += al;
   return bs;
 }
 
@@ -74,11 +75,11 @@ bxstr bxstr_dup(bxstr bs)
   bxstr newbs = malloc(sizeof(struct BoxStringData));
   if(newbs)
   {
-    newbs->length = bs->length;
+    newbs->size = bs->size;
     newbs->space =  bs->space;
     newbs->text = malloc(bs->space);
     if(newbs->text)
-      strncpy(newbs->text,bs->text,bs->length);
+      strncpy(newbs->text,bs->text,bs->size);
     else
     {
       free(newbs);
@@ -88,27 +89,23 @@ bxstr bxstr_dup(bxstr bs)
   return newbs;
 }
 
-bxstr bxstr_slice(bxstr bs, size_t start, size_t end)
+bxstr bxstr_fast_slice(bxstr bs, size_t start, size_t end)
 {
-  start = start > bs->length?bs->length:start;
-  end = end > bs->length?bs->length:end;
+  start = start > bs->size?bs->size:start;
+  end = end > bs->size?bs->size:end;
 
   bxstr newbs = malloc(sizeof(struct BoxStringData));
-  if(newbs)
+  if(newbs && (newbs->text = malloc(newbs->space)))
   {
-    newbs->length = end > start?end-start:start-end;
-    newbs->space =  (newbs->length/GROW_FACTOR+1)*GROW_FACTOR;
-    newbs->text = malloc(newbs->space);
-    if(newbs->text)
-    {
-      strncpy(newbs->text,bs->text+(end>start?start:end),newbs->length);
-      memset(newbs->text+newbs->length,0,newbs->space-newbs->length);
-    }
-    else
-    {
-      free(newbs);
-      newbs = 0;
-    }
+    newbs->size = end > start?end-start:start-end;
+    newbs->space =  (newbs->size/GROW_FACTOR+1)*GROW_FACTOR;
+    strncpy(newbs->text,bs->text+(end>start?start:end),newbs->size);
+    memset(newbs->text+newbs->size,0,newbs->space-newbs->size);
+  }
+  else
+  {
+    free(newbs);
+    newbs=0;
   }
   return newbs;
 }
