@@ -128,6 +128,7 @@ bxstr bxstr_slice(bxstr bs, size_t start, size_t end)
   if(newbs && (newbs->text = malloc(newbs->space)))
   {
     newbs->size = end > start?end-start:start-end;
+    newbs->size++; /* end inclusive slices */
     newbs->space =  (newbs->size/GROW_FACTOR+1)*GROW_FACTOR;
     strncpy(newbs->text,bs->text+(end>start?start:end),newbs->size);
     memset(newbs->text+newbs->size,0,newbs->space-newbs->size);

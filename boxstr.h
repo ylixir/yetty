@@ -22,7 +22,7 @@ bxstr bxstr_append(bxstr bs, char* add);
 bxstr bxstr_concat(bxstr first, bxstr second);
 bxstr bxstr_dup(bxstr bs);
 
-/* just rips through the raw data, one byte=1 unit */
+/* just rips through the raw data, one byte=1 unit, end inclusive */
 bxstr bxstr_slice(bxstr bs, size_t start, size_t end);
 /* length is the number of codepoints in the string */
 size_t bxstr_length(bxstr bs);

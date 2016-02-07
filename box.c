@@ -86,7 +86,26 @@ bool box_default_key_handler(Box b, BoxEvent bev)
     break;
   case TB_KEY_BACKSPACE:
   case TB_KEY_DELETE:
+  {
+    char* raw = bxstr_raw(b->text);
+    size_t end = bxstr_size(b->text);
+    bxstr new_text;
+    end--;
+    while(0x80==(raw[end]&0xC0))
+      end--;
+    end--;
+    new_text = bxstr_slice(b->text, 0, end);
+    if(new_text)
+    {
+      bxstr_unmake(b->text);
+      b->text = new_text;
+    }
+    tb_clear();
+    box_redraw(&rootbox);
+    box_redraw(zstack);
+    tb_present();
     break;
+  }
   default:
     if(bev.ch)
     {
