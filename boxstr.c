@@ -80,7 +80,22 @@ bxstr bxstr_append(bxstr bs, char* add)
 
 bxstr bxstr_concat(bxstr first, bxstr second)
 {
-
+  bxstr new_bs;
+  size_t new_space = ((first->size+second->size)/GROW_FACTOR+1)*GROW_FACTOR;
+  if((new_bs=malloc(sizeof(struct BoxStringData)))
+   &&(new_bs->text=malloc(new_space)))
+  {
+    new_bs->size = first->size+second->size;
+    new_bs->space = new_space;
+    strncpy(new_bs->text,first->text,first->size);
+    strncpy(new_bs->text+first->size,second->text,second->size+1);
+  }
+  else
+  {
+    free(new_bs);
+    new_bs = 0;
+  }
+  return new_bs;
 }
 
 bxstr bxstr_dup(bxstr bs)
@@ -91,7 +106,7 @@ bxstr bxstr_dup(bxstr bs)
   {
     new_bs->size = bs->size;
     new_bs->space =  bs->space;
-    strncpy(new_bs->text,bs->text,bs->size);
+    strncpy(new_bs->text,bs->text,bs->size+1);
   }
   else
   {
@@ -139,7 +154,8 @@ size_t bxstr_length(bxstr bs)
       where our outer loop thinks we are*/
     if(0xE0 == (bs->text[i]&0xC0))    {
     /* two byte sequence */
-      if(0x80==(bs->text[i+1]&0xC0))
+      if(i+1<bs->size
+      && 0x80==(bs->text[i+1]&0xC0))
         length++;
       else
         good_length = false;
@@ -147,8 +163,9 @@ size_t bxstr_length(bxstr bs)
     else if(0xF0 == (bs->text[i]&0xE0))
     {
     /* three byte sequence */
-      if((0x80==(bs->text[i+1]&0xC0))
-       &&(0x80==(bs->text[i+2]&0xC0)))
+      if(i+2<bs->size
+      && 0x80==(bs->text[i+1]&0xC0)
+      && 0x80==(bs->text[i+2]&0xC0))
       {
         length++;
         i+=1;
@@ -159,9 +176,10 @@ size_t bxstr_length(bxstr bs)
     else if(0xF8 == (bs->text[i]&0xF0))
     {
     /* four byte sequence */
-      if((0x80==(bs->text[i+1]&0xC0))
-       &&(0x80==(bs->text[i+2]&0xC0))
-       &&(0x80==(bs->text[i+3]&0xC0)))
+      if(i+3<bs->size
+      && 0x80==(bs->text[i+1]&0xC0)
+      && 0x80==(bs->text[i+2]&0xC0)
+      && 0x80==(bs->text[i+3]&0xC0))
       {
         length++;
         i+=2;
@@ -172,10 +190,11 @@ size_t bxstr_length(bxstr bs)
     else if(0xFC == (bs->text[i]&0xF8))
     {
     /* five byte sequence */
-      if((0x80==(bs->text[i+1]&0xC0))
-        &&(0x80==(bs->text[i+2]&0xC0))
-        &&(0x80==(bs->text[i+3]&0xC0))
-        &&(0x80==(bs->text[i+4]&0xC0)))
+      if(i+4<bs->size
+      && 0x80==(bs->text[i+1]&0xC0)
+      && 0x80==(bs->text[i+2]&0xC0)
+      && 0x80==(bs->text[i+3]&0xC0)
+      && 0x80==(bs->text[i+4]&0xC0))
       {
         length++;
         i+=3;
@@ -186,11 +205,12 @@ size_t bxstr_length(bxstr bs)
     else if(0xFE == (bs->text[i]&0xFC))
     {
     /* six byte sequence */
-      if((0x80==(bs->text[bs->size+1]&0xC0))
-        &&(0x80==(bs->text[bs->size+2]&0xC0))
-        &&(0x80==(bs->text[bs->size+3]&0xC0))
-        &&(0x80==(bs->text[bs->size+4]&0xC0))
-        &&(0x80==(bs->text[bs->size+5]&0xC0)))
+      if(i+5<bs->size
+      && 0x80==(bs->text[bs->size+1]&0xC0)
+      && 0x80==(bs->text[bs->size+2]&0xC0)
+      && 0x80==(bs->text[bs->size+3]&0xC0)
+      && 0x80==(bs->text[bs->size+4]&0xC0)
+      && 0x80==(bs->text[bs->size+5]&0xC0))
       {
         length++;
         i+=4;
