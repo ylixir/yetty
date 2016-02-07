@@ -11,6 +11,7 @@
 #include "boxstr.h"
 
 #include <string.h>
+#include <stdbool.h>
 
 const int GROW_FACTOR=100;
 struct BoxStringData
@@ -18,40 +19,47 @@ struct BoxStringData
   char* text;
   size_t size;   /*number of bytes in string */
   size_t space;  /*number of bytes available */
-  size_t length; /*number of characters in string */
 };
 
-bxstr bxstr_make(char* txt)
+bxstr bxstr_make(char* text)
 {
-  bxstr bs = malloc(sizeof(struct BoxStringData));
-  txt = txt?txt:"";
-  if(bs)
+  bxstr bs;
+  size_t size,space;
+
+  /*if they pass in a null string then make an empty string*/
+  text = text?text:"";
+
+  /*find out how much room we need
+    it's annoying that we have to scan the string twice*/
+  size = strlen(text);
+  space = (size/GROW_FACTOR+1)*GROW_FACTOR;
+
+  if((bs=malloc(sizeof(struct BoxStringData)))
+    && (bs->text=malloc(space)))
   {
-    bs->size=strlen(txt);
-    bs->space=(bs->size/GROW_FACTOR+1)*GROW_FACTOR;
-    bs->text=malloc(bs->space);
-    if(bs->text)
-      strncpy(bs->text,txt,bs->space);
-    else
-    {
-      free(bs);
-      bs = 0;
-    }
+    bs->space = space;
+    bs->size = size;
+    strcpy(bs->text, text);
+  }
+  else
+  {
+    free(bs);
+    bs = 0;
   }
   return bs;
 }
 
 void bxstr_unmake(bxstr bs)
 {
-  if(bs->text) free(bs->text);
+  if(bs) free(bs->text);
   free(bs);
 }
 
 bxstr bxstr_append(bxstr bs, char* add)
 {
-  size_t diff = bs->space-bs->size;
-  size_t al = strlen(add);
-  if(diff <= al)
+  size_t diff = bs->space - bs->size;
+  size_t add_len = strlen(add);
+  if(diff <= add_len)
   {
     size_t newspace = bs->space+(diff/GROW_FACTOR+1)*GROW_FACTOR;
     char* newtext = malloc(newspace);
@@ -59,40 +67,47 @@ bxstr bxstr_append(bxstr bs, char* add)
       return 0;
     else
     {
-      strncpy(newtext,bs->text,newspace);
+      strncpy(newtext,bs->text,bs->size);
       free(bs->text);
       bs->text = newtext;
       bs->space= newspace;
     }
   }
   strcpy(bs->text+bs->size,add);
-  bs->size += al;
+  bs->size += add_len;
   return bs;
+}
+
+bxstr bxstr_concat(bxstr first, bxstr second)
+{
+
 }
 
 bxstr bxstr_dup(bxstr bs)
 {
-  bxstr newbs = malloc(sizeof(struct BoxStringData));
-  if(newbs)
+  bxstr new_bs;
+  if((new_bs= malloc(sizeof(struct BoxStringData)))
+   &&(new_bs->text = malloc(bs->space)))
   {
-    newbs->size = bs->size;
-    newbs->space =  bs->space;
-    newbs->text = malloc(bs->space);
-    if(newbs->text)
-      strncpy(newbs->text,bs->text,bs->size);
-    else
-    {
-      free(newbs);
-      newbs = 0;
-    }
+    new_bs->size = bs->size;
+    new_bs->space =  bs->space;
+    strncpy(new_bs->text,bs->text,bs->size);
   }
-  return newbs;
+  else
+  {
+    free(new_bs);
+    new_bs = 0;
+  }
+  return new_bs;
 }
 
-bxstr bxstr_fast_slice(bxstr bs, size_t start, size_t end)
+bxstr bxstr_slice(bxstr bs, size_t start, size_t end)
 {
-  start = start > bs->size?bs->size:start;
-  end = end > bs->size?bs->size:end;
+  start = start > bs->size
+          ? bs->size          : start;
+  end = end > bs->size
+        ?bs->size
+        :end;
 
   bxstr newbs = malloc(sizeof(struct BoxStringData));
   if(newbs && (newbs->text = malloc(newbs->space)))
@@ -108,6 +123,101 @@ bxstr bxstr_fast_slice(bxstr bs, size_t start, size_t end)
     newbs=0;
   }
   return newbs;
+}
+
+size_t bxstr_length(bxstr bs)
+{
+  bool good_length = true;
+  size_t length = 0;
+
+  for(size_t i=0; i<bs->size; i++)
+  {
+    /*just skim over the single byte utf8 chars*/
+    for(;i<bs->size && 0==(bs->text[i]&0x80);i++)
+      length++;
+    /*note that at this point we are one byte past
+      where our outer loop thinks we are*/
+    if(0xE0 == (bs->text[i]&0xC0))    {
+    /* two byte sequence */
+      if(0x80==(bs->text[i+1]&0xC0))
+        length++;
+      else
+        good_length = false;
+    }
+    else if(0xF0 == (bs->text[i]&0xE0))
+    {
+    /* three byte sequence */
+      if((0x80==(bs->text[i+1]&0xC0))
+       &&(0x80==(bs->text[i+2]&0xC0)))
+      {
+        length++;
+        i+=1;
+      }
+      else
+        good_length = false;
+    }
+    else if(0xF8 == (bs->text[i]&0xF0))
+    {
+    /* four byte sequence */
+      if((0x80==(bs->text[i+1]&0xC0))
+       &&(0x80==(bs->text[i+2]&0xC0))
+       &&(0x80==(bs->text[i+3]&0xC0)))
+      {
+        length++;
+        i+=2;
+      }
+      else
+        good_length = false;
+    }
+    else if(0xFC == (bs->text[i]&0xF8))
+    {
+    /* five byte sequence */
+      if((0x80==(bs->text[i+1]&0xC0))
+        &&(0x80==(bs->text[i+2]&0xC0))
+        &&(0x80==(bs->text[i+3]&0xC0))
+        &&(0x80==(bs->text[i+4]&0xC0)))
+      {
+        length++;
+        i+=3;
+      }
+      else
+        good_length = false;
+    }
+    else if(0xFE == (bs->text[i]&0xFC))
+    {
+    /* six byte sequence */
+      if((0x80==(bs->text[bs->size+1]&0xC0))
+        &&(0x80==(bs->text[bs->size+2]&0xC0))
+        &&(0x80==(bs->text[bs->size+3]&0xC0))
+        &&(0x80==(bs->text[bs->size+4]&0xC0))
+        &&(0x80==(bs->text[bs->size+5]&0xC0)))
+      {
+        length++;
+        i+=4;
+      }
+      else
+        good_length = false;
+    }
+    else if(0 == bs->text[i])
+    {
+    /* end of the string */
+      break;
+    }
+    else
+    {
+    /* invalid byte */
+      good_length=false;
+    }
+  }
+  if(false == good_length)
+    return 0;
+  else
+    return length;
+}
+
+size_t bxstr_size(bxstr bs)
+{
+  return bs->size;
 }
 
 char* bxstr_raw(bxstr bs)
